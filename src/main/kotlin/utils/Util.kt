@@ -1,8 +1,8 @@
 package top.cutestar.networkTools.utils
 
+import com.maxmind.geoip2.DatabaseReader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import net.mamoe.mirai.console.command.CommandSender
@@ -10,23 +10,24 @@ import net.mamoe.mirai.message.data.ForwardMessageBuilder
 import net.mamoe.mirai.message.data.PlainText
 import net.mamoe.mirai.message.data.buildMessageChain
 import top.cutestar.networkTools.Config
+import top.cutestar.networkTools.NetworkTools
+import java.io.File
+import java.net.InetAddress
 import java.util.*
 import java.util.regex.Pattern
 import javax.naming.NameNotFoundException
 import javax.naming.directory.InitialDirContext
 
-object Util {
-    @Serializable
-    data class LocationData(val data: LocationData2)
 
-    @Serializable
-    data class LocationData2(val location: String)
+object Util {
 
     private const val LOCAL_TEXT = "本地局域网"
     private const val IP46_RULE =
         "((((25[0-5]|2[0-4]\\d|[01]?\\d\\d?)\\.){3}(25[0-5]|2[0-4]\\d|[01]?\\d\\d?))|((([a-fA-F0-9]){1,4}:)+(:?(([a-fA-F0-9]){1,4}:?)+)?))"
 
     val charset = ('a'..'z').toList() + ('A'..'Z').toList() + ('0'..'9').toList()
+    val databaseReader = DatabaseReader.Builder(File(NetworkTools.dataFolder, "dbip.mmdb")).build()
+    val asnDatabaseReader = DatabaseReader.Builder(File(NetworkTools.dataFolder, "GeoLite2-ASN.mmdb")).build()
 
     fun getLocation(address: String): String {
         when {
@@ -36,13 +37,11 @@ object Util {
                 if (second in 16..31) return LOCAL_TEXT
             }
         }
-        /**
-         * from "ip.zxinc.org"
-         */
-        val url = "https://ip.zxinc.org/api.php?type=json&ip=$address"
-        val s = HttpUtil(url, useProxy = false).getString(Config.webCharset)
-        val json = Json { ignoreUnknownKeys = true }
-        return json.decodeFromString<LocationData>(s).data.location
+
+        val ipAddress = InetAddress.getByName(address)
+        val resp = databaseReader.enterprise(ipAddress)
+        val asnresp = asnDatabaseReader.asn(ipAddress)
+        return "${resp.country.names.get("zh-CN")}${resp.mostSpecificSubdivision.names.get("zh-CN")}${resp.city.names.get("zh-CN")} AS${asnresp.autonomousSystemNumber} ${asnresp.autonomousSystemOrganization}"
     }
 
     fun CommandSender.withHelper(block: suspend () -> Unit) = launch(Dispatchers.IO) {

@@ -66,7 +66,7 @@ class HttpUtil(
     fun getConnection(): HttpURLConnection = http!!
 
     fun getBytes(autoClose: Boolean = true): ByteArray {
-        val bytes = inp!!.readAllBytes()
+        val bytes = inp!!.readBytes()
         if (autoClose) close()
         return bytes
     }
