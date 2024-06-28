@@ -1,6 +1,7 @@
 package top.cutestar.networkTools.utils
 
 import com.maxmind.geoip2.DatabaseReader
+import com.maxmind.geoip2.exception.AddressNotFoundException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
@@ -30,18 +31,24 @@ object Util {
     val asnDatabaseReader = DatabaseReader.Builder(File(NetworkTools.dataFolder, "GeoLite2-ASN.mmdb")).build()
 
     fun getLocation(address: String): String {
-        when {
-            "192.168." in address -> return LOCAL_TEXT
-            "172." in address -> {
-                val second = address.split(".")[1].toInt()
-                if (second in 16..31) return LOCAL_TEXT
+        try {
+            when {
+                "192.168." in address -> return LOCAL_TEXT
+                "172." in address -> {
+                    val second = address.split(".")[1].toInt()
+                    if (second in 16..31) return LOCAL_TEXT
+                }
             }
-        }
 
-        val ipAddress = InetAddress.getByName(address)
-        val resp = databaseReader.enterprise(ipAddress)
-        val asnresp = asnDatabaseReader.asn(ipAddress)
-        return "${resp.country.names.get("zh-CN")}${resp.mostSpecificSubdivision.names.get("zh-CN")}${resp.city.names.get("zh-CN")} AS${asnresp.autonomousSystemNumber} ${asnresp.autonomousSystemOrganization}"
+            val ipAddress = InetAddress.getByName(address)
+            val resp = databaseReader.enterprise(ipAddress)
+            val asnresp = asnDatabaseReader.asn(ipAddress)
+            return "${resp.country.names["zh-CN"] ?: ""}${resp.mostSpecificSubdivision.names["zh-CN"] ?: ""}${
+                resp.city.names["zh-CN"] ?: ""
+            } AS${asnresp.autonomousSystemNumber ?: ""} ${asnresp.autonomousSystemOrganization ?: ""}"
+        } catch (_: AddressNotFoundException) {
+            return "null"
+        }
     }
 
     fun CommandSender.withHelper(block: suspend () -> Unit) = launch(Dispatchers.IO) {
