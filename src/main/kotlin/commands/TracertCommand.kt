@@ -46,13 +46,20 @@ object TracertCommand : SimpleCommand(
             hosts.forEach { host ->
                 launch(Dispatchers.IO) {
                     val sb = StringBuilder()
-                    val command = "nexttrace --ipv4 " + host
+                    val command =
+                        (if ("windows" in System.getProperty("os.name").lowercase())
+                            Config.tracertWCommand
+                        else
+                            Config.tracertOCommand).replace("${"$"}address", host)
                     val process = Runtime.getRuntime().exec(command)
                     val time = measureTimeMillis { process.waitFor() }
                     val buffer = process.inputStream.bufferedReader(Charset.forName(Config.consoleCharset))
                     var s = buffer.readLine()
                     while (s != null) {
                         val msg = StringBuilder(s).append("\n")
+                        Util.getIp(s).let { ip ->
+                            if (ip != null) msg.append(Util.getLocation(ip)).append("\n\n")
+                        }
                         sb.append(msg.toString())
                         s = buffer.readLine()
                     }
